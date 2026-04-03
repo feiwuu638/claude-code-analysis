@@ -1,0 +1,99 @@
+<h1>LLM API 层</h1>
+<p class="subtitle"><code>services/api/</code> 负责与 Anthropic API 的所有通信，包括流式调用、重试、prompt cache 管理和 beta 功能协商。</p>
+
+<h2 id="api-call-flow">调用流程</h2>
+<div class="flow">
+  <div class="flow-step">
+    <div class="flow-step-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
+    <div class="flow-card">
+      <div class="flow-card-title">① 构建请求参数</div>
+      <ul class="flow-card-items">
+        <li><code>normalizeMessagesForAPI()</code> — 规范化消息格式，处理 thinking block 约束</li>
+        <li><code>buildSystemPromptBlocks()</code> — 将 System Prompt 数组转为带 cache_control 的 block 列表</li>
+        <li><code>toolToAPISchema()</code> — 将工具定义转为 API 所需的 JSON schema 格式</li>
+        <li>协商 beta headers（thinking、prompt caching、fast mode、effort 等）</li>
+      </ul>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
+    <div class="flow-card">
+      <div class="flow-card-title">② 发起流式请求</div>
+      <ul class="flow-card-items">
+        <li>调用 <code>anthropic.beta.messages.stream()</code></li>
+        <li>携带 <code>anthropic-beta</code> header 启用实验性功能</li>
+        <li>支持多个 API provider：Anthropic 直连、AWS Bedrock、GCP Vertex、自定义 base URL</li>
+      </ul>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
+    <div class="flow-card">
+      <div class="flow-card-title">③ 处理流式事件</div>
+      <ul class="flow-card-items">
+        <li><code>content_block_start</code> — 新 block 开始（text / tool_use / thinking）</li>
+        <li><code>content_block_delta</code> — 增量内容，实时 yield 给 Agent 循环</li>
+        <li><code>message_delta</code> — stop_reason、usage 统计</li>
+        <li><code>message_stop</code> — 请求完成，记录 token 用量和费用</li>
+      </ul>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-left"><div class="flow-dot"></div></div>
+    <div class="flow-card">
+      <div class="flow-card-title">④ 错误处理与重试</div>
+      <ul class="flow-card-items">
+        <li>网络错误、超时 → <code>withRetry()</code> 指数退避重试，最多 10 次</li>
+        <li>529 过载 → 仅前台查询重试（最多 3 次），后台任务直接失败</li>
+        <li>401 OAuth → 自动刷新 token 后重试</li>
+        <li>主模型失败 → 降级到 <code>fallbackModel</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 id="prompt-cache">Prompt Cache 机制</h2>
+<p>Claude Code 对 System Prompt 做了精细的缓存控制，以最大化 cache hit 率，降低 API 成本：</p>
+<table>
+  <tr><th>策略</th><th>说明</th></tr>
+  <tr><td><code>scope: 'global'</code></td><td>静态段落（BOUNDARY 之前）跨 org 共享缓存，所有用户共用同一份缓存</td></tr>
+  <tr><td><code>scope: 'session'</code></td><td>动态段落（BOUNDARY 之后）仅在同一 session 内复用</td></tr>
+  <tr><td>1h cache</td><td>支持 1 小时长效缓存（beta feature），适合长会话</td></tr>
+  <tr><td>cache editing</td><td>cached microcompact 模式下可直接修改缓存内容，避免 cache bust</td></tr>
+</table>
+<p>System Prompt 被拆分为多个 block，每个 block 独立设置 <code>cache_control</code>。静态 block 命中全局缓存时，只需支付极低的 cache read token 费用。</p>
+
+<h2 id="beta-headers">Beta Features 协商</h2>
+<p>Claude Code 通过 <code>anthropic-beta</code> header 启用多个实验性功能，在每次请求时动态决定是否携带：</p>
+<table>
+  <tr><th>Header</th><th>功能</th></tr>
+  <tr><td><code>interleaved-thinking-2025-05-14</code></td><td>Extended thinking 模式</td></tr>
+  <tr><td><code>prompt-caching-2024-07-31</code></td><td>Prompt cache</td></tr>
+  <tr><td><code>fast-mode-2025-XX-XX</code></td><td>Fast mode（更快响应，有配额）</td></tr>
+  <tr><td><code>task-budgets-2026-03-13</code></td><td>Token 预算控制</td></tr>
+  <tr><td><code>context-management-2025-XX-XX</code></td><td>API 侧上下文管理</td></tr>
+  <tr><td><code>afk-mode</code></td><td>AFK 自主模式</td></tr>
+</table>
+
+<h2 id="retry-logic">重试逻辑</h2>
+<p><code>services/api/withRetry.ts</code> 实现了完整的重试策略：</p>
+<pre><code>const DEFAULT_MAX_RETRIES = 10
+const BASE_DELAY_MS = 500      // 基础延迟
+const MAX_529_RETRIES = 3      // 529 过载最多重试次数
+const FLOOR_OUTPUT_TOKENS = 3000  // 最小输出 token 保底值</code></pre>
+<p>重试策略要点：</p>
+<ul>
+  <li>指数退避：每次重试延迟翻倍，加随机 jitter 避免惊群</li>
+  <li>529 过载只对前台查询（用户正在等待）重试，后台任务（compact、summary 等）直接失败，避免放大服务端压力</li>
+  <li>Fast mode 被拒绝时自动触发冷却，降级到普通模式重试</li>
+  <li>OAuth 401 自动刷新 token 后重试一次</li>
+</ul>
+
+<h2 id="multi-provider">多 Provider 支持</h2>
+<p>通过 <code>getAPIProvider()</code> 动态选择 API provider，支持：</p>
+<ul>
+  <li><strong>Anthropic 直连</strong>：默认，使用 <code>ANTHROPIC_API_KEY</code></li>
+  <li><strong>AWS Bedrock</strong>：通过 AWS credentials，模型 ID 映射为 Bedrock inference profile</li>
+  <li><strong>GCP Vertex AI</strong>：通过 GCP credentials</li>
+  <li><strong>自定义 base URL</strong>：<code>ANTHROPIC_BASE_URL</code> 环境变量，支持代理或兼容 API</li>
+</ul>

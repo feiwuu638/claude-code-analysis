@@ -1,0 +1,75 @@
+<h1>Agent 群集（Swarm）</h1>
+<p class="subtitle">Claude Code 支持生成子 Agent 并行处理独立任务，通过 Coordinator 模式协调多 Agent 协作，实现复杂工作流的自动化编排。</p>
+
+<h2 id="swarm-overview">架构概览</h2>
+<p>Agent 群集由三个层次组成：</p>
+<table>
+  <tr><th>层次</th><th>角色</th><th>关键文件</th></tr>
+  <tr><td>主 Agent</td><td>接收用户指令，决策何时生成子 Agent</td><td><code>query.ts</code></td></tr>
+  <tr><td>Coordinator</td><td>多 Agent 协调器，管理 Team、分配任务</td><td><code>coordinator/coordinatorMode.ts</code></td></tr>
+  <tr><td>子 Agent（Worker）</td><td>执行具体任务，结果返回给父 Agent</td><td><code>tools/AgentTool/runAgent.ts</code></td></tr>
+</table>
+
+<h2 id="agent-spawn">子 Agent 生成机制</h2>
+<p>主 Agent 通过调用 <code>Agent</code> 工具生成子 Agent。每个子 Agent 本质上是一个独立的 <code>query()</code> 调用，拥有自己的：</p>
+<ul>
+  <li>独立的消息历史（从空白开始，或继承 fork 上下文）</li>
+  <li>独立的工具集（可通过 <code>tools</code> / <code>disallowedTools</code> 限制）</li>
+  <li>独立的 System Prompt（通过 <code>enhanceSystemPromptWithEnvDetails()</code> 注入环境信息）</li>
+  <li>独立的 abort controller（可被父 Agent 取消）</li>
+  <li>独立的 MCP 连接（按需连接子 Agent 需要的 MCP server）</li>
+</ul>
+
+<h2 id="fork-vs-subagent">Fork 与 Subagent 的区别</h2>
+<p>当 feature flag <code>FORK_SUBAGENT</code> 启用时，Agent 工具支持两种模式：</p>
+<table>
+  <tr><th>模式</th><th>调用方式</th><th>上下文</th><th>适用场景</th></tr>
+  <tr><td><strong>Fork</strong></td><td>不指定 <code>subagent_type</code></td><td>继承父 Agent 完整对话上下文和 prompt cache</td><td>研究类任务、需要父 Agent 背景的工作</td></tr>
+  <tr><td><strong>Subagent</strong></td><td>指定 <code>subagent_type</code></td><td>全新上下文，需在 prompt 中提供完整背景</td><td>独立任务、专用 Agent 类型</td></tr>
+</table>
+<div class="callout">
+  <p><strong>Fork 的优势：</strong> 继承父 Agent 的 prompt cache，不需要重新缓存 System Prompt，成本更低。但不同模型的 fork 无法复用缓存，因此 fork 不应指定 <code>model</code> 参数。</p>
+</div>
+
+<h2 id="coordinator-mode">Coordinator 模式</h2>
+<p>通过环境变量 <code>CLAUDE_CODE_COORDINATOR_MODE=1</code> 启用。Coordinator 是一个特殊的主 Agent，专门负责任务分解和多 Agent 协调：</p>
+<ul>
+  <li>使用精简版 Agent Tool prompt（去掉冗余使用说明）</li>
+  <li>可使用 <code>TeamCreate</code> / <code>TeamDelete</code> 工具管理 Agent 团队</li>
+  <li>可使用 <code>SendMessage</code> 向已有 Agent 发送消息</li>
+  <li>Worker Agent 不能再生成 Coordinator 级别的子 Agent（防止无限嵌套）</li>
+</ul>
+
+<h2 id="background-agents">后台 Agent</h2>
+<p>Agent 工具支持 <code>run_in_background: true</code> 参数，让子 Agent 在后台运行：</p>
+<ul>
+  <li>主 Agent 不阻塞，可继续与用户交互</li>
+  <li>子 Agent 完成后通过通知机制告知主 Agent</li>
+  <li>主 Agent 不应轮询或主动检查后台 Agent 状态</li>
+  <li>后台 Agent 的输出文件路径在工具返回结果中提供</li>
+</ul>
+
+<h2 id="worktree-isolation">Worktree 隔离</h2>
+<p>通过 <code>isolation: "worktree"</code> 参数，Agent 可以在独立的 git worktree 中运行：</p>
+<ul>
+  <li>自动创建临时 worktree，Agent 在其中操作文件</li>
+  <li>若 Agent 未做任何修改，worktree 自动清理</li>
+  <li>若有修改，返回 worktree 路径和分支名，供主 Agent 决定如何合并</li>
+</ul>
+
+<h2 id="agent-memory">Agent 内存与状态</h2>
+<p><code>tools/AgentTool/agentMemory.ts</code> 管理子 Agent 的状态持久化：</p>
+<ul>
+  <li>子 Agent 的对话历史可序列化到磁盘，支持 <code>/resume</code> 恢复</li>
+  <li><code>SendMessage</code> 工具通过 Agent ID 或名称找到已有 Agent，注入新消息继续执行</li>
+  <li>Agent 的 file state cache 从父 Agent clone，避免重复读取文件</li>
+</ul>
+
+<button class="prompt-trigger" data-prompt="agent-writing-prompt">
+  <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8V1.5Z"/></svg>
+  Agent Prompt 写作指南
+</button>
+<button class="prompt-trigger" data-prompt="agent-fork-rules">
+  <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8V1.5Z"/></svg>
+  Fork 行为规范（Don't peek / Don't race）
+</button>

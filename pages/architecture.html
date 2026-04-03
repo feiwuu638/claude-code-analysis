@@ -1,0 +1,135 @@
+<h1>整体架构</h1>
+<p class="subtitle">Claude Code 是一个分层的 Agentic 系统。本章从顶层视角梳理各模块的职责边界与相互关系。</p>
+
+<h2 id="dir-structure">目录结构</h2>
+<p>源码全部位于 <code>src/</code> 下，按功能划分为以下主要目录：</p>
+<pre><code>src/
+├── main.tsx              # 程序入口，CLI 解析 + React/Ink 渲染初始化
+├── query.ts              # Agent 主循环（核心）
+├── QueryEngine.ts        # LLM 查询引擎，流式响应处理
+├── Tool.ts               # 工具基类型定义
+├── tools.ts              # 工具注册表
+├── commands.ts           # 斜杠命令注册
+│
+├── tools/                # 40+ 个工具实现（每个工具一个目录）
+├── commands/             # 斜杠命令实现（~50 个）
+├── components/           # Ink UI 组件（~140 个）
+├── hooks/                # React hooks（含权限系统）
+├── services/             # 外部服务集成
+│   ├── api/              # Anthropic API 客户端
+│   ├── mcp/              # MCP 协议
+│   ├── compact/          # 上下文压缩
+│   ├── analytics/        # GrowthBook feature flags + 遥测
+│   └── ...
+├── utils/                # 工具函数（150+ 子目录）
+├── constants/            # 常量，含 System Prompt 构建逻辑
+├── types/                # TypeScript 类型定义
+├── state/                # 全局状态管理
+├── bridge/               # IDE 扩展双向通信（VS Code / JetBrains）
+├── coordinator/          # 多 Agent 协调器
+├── ink/                  # 自定义终端 UI 框架
+├── memdir/               # 持久化 Memory 目录
+├── skills/               # Skill 系统
+└── query/                # 查询管道子模块</code></pre>
+
+<h2 id="module-map">核心模块地图</h2>
+<table>
+  <tr><th>模块</th><th>关键文件</th><th>职责</th></tr>
+  <tr><td>程序入口</td><td><code>main.tsx</code></td><td>CLI 解析、并行预加载、启动 React/Ink 渲染</td></tr>
+  <tr><td>Agent 主循环</td><td><code>query.ts</code></td><td>驱动 LLM → 工具执行 → 递归的核心循环</td></tr>
+  <tr><td>查询引擎</td><td><code>QueryEngine.ts</code></td><td>流式 API 调用、thinking 模式、token 计数</td></tr>
+  <tr><td>System Prompt</td><td><code>constants/prompts.ts</code></td><td>构建发送给 Claude 的完整系统提示词</td></tr>
+  <tr><td>Prompt 缓存</td><td><code>constants/systemPromptSections.ts</code></td><td>模块化 prompt 段落，按需缓存/重算</td></tr>
+  <tr><td>工具系统</td><td><code>Tool.ts</code> + <code>tools/*/</code></td><td>定义工具接口、权限模型、执行逻辑</td></tr>
+  <tr><td>权限系统</td><td><code>hooks/toolPermission/</code></td><td>每次工具调用前的多层权限检查</td></tr>
+  <tr><td>状态管理</td><td><code>state/AppState.tsx</code></td><td>React Context 全局状态，含权限模式、MCP 状态</td></tr>
+  <tr><td>消息处理</td><td><code>utils/messages.ts</code></td><td>创建、规范化各类消息（user/assistant/tool_result）</td></tr>
+  <tr><td>API 层</td><td><code>services/api/claude.ts</code></td><td>调用 Anthropic API，处理流式响应</td></tr>
+  <tr><td>上下文压缩</td><td><code>services/compact/</code></td><td>对话超长时自动摘要压缩</td></tr>
+  <tr><td>终端 UI</td><td><code>ink/</code> + <code>components/</code></td><td>React 式终端渲染，支持鼠标/键盘/布局</td></tr>
+  <tr><td>IDE Bridge</td><td><code>bridge/</code></td><td>与 VS Code、JetBrains 扩展双向通信</td></tr>
+  <tr><td>Agent 群集</td><td><code>coordinator/</code> + <code>tools/AgentTool/</code></td><td>子 Agent 生成与多 Agent 协调</td></tr>
+</table>
+
+<h2 id="layered-arch">分层架构图</h2>
+<div class="arch-diagram">
+  <svg viewBox="0 0 680 400" xmlns="http://www.w3.org/2000/svg" class="arch-svg">
+    <defs>
+      <marker id="archArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#484f58"/>
+      </marker>
+    </defs>
+
+    <!-- Layer 1: UI -->
+    <rect x="40" y="20" width="600" height="64" rx="8" fill="#1c2128" stroke="#388bfd" stroke-width="1.5"/>
+    <text x="340" y="44" text-anchor="middle" fill="#79c0ff" font-size="13" font-weight="700">用户界面层</text>
+    <text x="340" y="62" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="monospace">CLI (Commander.js)　·　Terminal UI (React + Ink)　·　IDE Bridge</text>
+
+    <!-- Arrow L1→L2 -->
+    <line x1="340" y1="84" x2="340" y2="108" stroke="#484f58" stroke-width="1.5" marker-end="url(#archArrow)"/>
+
+    <!-- Layer 2: Agent Loop -->
+    <rect x="40" y="110" width="600" height="64" rx="8" fill="#1c2128" stroke="#d29922" stroke-width="1.5"/>
+    <text x="340" y="134" text-anchor="middle" fill="#e3b341" font-size="13" font-weight="700">Agent 循环层</text>
+    <text x="340" y="152" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="monospace">query.ts　·　QueryEngine.ts　·　query/config.ts　·　coordinator/</text>
+
+    <!-- Arrows L2→L3 (three branches) -->
+    <line x1="150" y1="174" x2="150" y2="208" stroke="#484f58" stroke-width="1.5" marker-end="url(#archArrow)"/>
+    <line x1="340" y1="174" x2="340" y2="208" stroke="#484f58" stroke-width="1.5" marker-end="url(#archArrow)"/>
+    <line x1="530" y1="174" x2="530" y2="208" stroke="#484f58" stroke-width="1.5" marker-end="url(#archArrow)"/>
+
+    <!-- Layer 3a: Prompt (x=40, w=186) -->
+    <rect x="40" y="210" width="186" height="72" rx="8" fill="#1c2128" stroke="#3fb950" stroke-width="1.5"/>
+    <text x="133" y="234" text-anchor="middle" fill="#56d364" font-size="12" font-weight="700">Prompt 层</text>
+    <text x="133" y="252" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">constants/prompts.ts</text>
+    <text x="133" y="268" text-anchor="middle" fill="#8b949e" font-size="10.5" font-family="monospace">systemPromptSections.ts</text>
+
+    <!-- Layer 3b: API (x=234, w=186) -->
+    <rect x="234" y="210" width="186" height="72" rx="8" fill="#1c2128" stroke="#3fb950" stroke-width="1.5"/>
+    <text x="327" y="234" text-anchor="middle" fill="#56d364" font-size="12" font-weight="700">API 层</text>
+    <text x="327" y="252" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">services/api/claude.ts</text>
+    <text x="327" y="268" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">withRetry · streaming</text>
+
+    <!-- Layer 3c: Tools (x=428, w=212) -->
+    <rect x="428" y="210" width="212" height="72" rx="8" fill="#1c2128" stroke="#3fb950" stroke-width="1.5"/>
+    <text x="534" y="234" text-anchor="middle" fill="#56d364" font-size="12" font-weight="700">工具执行层</text>
+    <text x="534" y="252" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">tools/* · Tool.ts</text>
+    <text x="534" y="268" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">toolOrchestration</text>
+
+    <!-- Arrow L3c→L4 -->
+    <line x1="534" y1="282" x2="534" y2="316" stroke="#484f58" stroke-width="1.5" marker-end="url(#archArrow)"/>
+
+    <!-- Layer 4: Permission -->
+    <rect x="428" y="318" width="212" height="62" rx="8" fill="#1c2128" stroke="#f85149" stroke-width="1.5"/>
+    <text x="534" y="342" text-anchor="middle" fill="#ff7b72" font-size="12" font-weight="700">权限系统</text>
+    <text x="534" y="360" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">hooks/toolPermission/</text>
+    <text x="534" y="374" text-anchor="middle" fill="#8b949e" font-size="10.5" font-family="monospace">PermissionContext · canUseTool()</text>
+
+    <!-- Layer labels on left -->
+    <text x="22" y="56" text-anchor="middle" fill="#388bfd" font-size="9" font-weight="600" transform="rotate(-90,22,56)">L1</text>
+    <text x="22" y="144" text-anchor="middle" fill="#d29922" font-size="9" font-weight="600" transform="rotate(-90,22,144)">L2</text>
+    <text x="22" y="248" text-anchor="middle" fill="#3fb950" font-size="9" font-weight="600" transform="rotate(-90,22,248)">L3</text>
+    <text x="22" y="350" text-anchor="middle" fill="#f85149" font-size="9" font-weight="600" transform="rotate(-90,22,350)">L4</text>
+  </svg>
+</div>
+
+<h2 id="design-patterns">关键设计模式</h2>
+
+<h3 id="parallel-prefetch">并行预加载（Startup 优化）</h3>
+<p>启动时在主模块加载前并行触发多个预加载任务，显著降低冷启动延迟：</p>
+<pre><code>// main.tsx — 作为副作用在 import 之前触发
+startMdmRawRead()       // MDM 配置预读
+startKeychainPrefetch() // Keychain 凭证预读
+// + API 预连接、GrowthBook 初始化</code></pre>
+
+<h3 id="feature-flags">Feature Flag 死代码消除</h3>
+<p>通过 Bun 的 <code>bun:bundle</code> 在构建时静态消除未启用的功能代码，外部用户构建中这些代码完全不存在：</p>
+<pre><code>import { feature } from 'bun:bundle'
+
+const voiceCommand = feature('VOICE_MODE')
+  ? require('./commands/voice/index.js').default
+  : null  // 外部构建中此分支被完全删除</code></pre>
+<p>已知的 Feature Flag 包括：<code>PROACTIVE</code>、<code>KAIROS</code>、<code>BRIDGE_MODE</code>、<code>DAEMON</code>、<code>VOICE_MODE</code>、<code>AGENT_TRIGGERS</code>、<code>MONITOR_TOOL</code>、<code>TOKEN_BUDGET</code>、<code>HISTORY_SNIP</code>、<code>CONTEXT_COLLAPSE</code> 等。</p>
+
+<h3 id="lazy-loading">懒加载重模块</h3>
+<p>OpenTelemetry、gRPC、分析模块等重量级依赖通过动态 <code>import()</code> 延迟加载，只在真正需要时才初始化。</p>

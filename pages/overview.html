@@ -1,0 +1,133 @@
+<h1>Claude Code 源码解析</h1>
+<p class="subtitle">本文档基于 2026-03-31 通过 npm source map 暴露的 Claude Code 源码快照，对其架构、核心循环、Prompt 系统及工具体系进行深度还原与解析。</p>
+
+<div class="stats-grid">
+  <div class="stat-card" data-target="1900" data-suffix="+" data-label="源文件数">
+    <div class="stat-icon">📁</div>
+    <div class="stat-number"><span class="stat-count">0</span><span class="stat-unit">+</span></div>
+    <div class="stat-label">源文件数</div>
+  </div>
+  <div class="stat-card" data-target="512000" data-suffix="+" data-label="代码行数">
+    <div class="stat-icon">📝</div>
+    <div class="stat-number"><span class="stat-count">0</span><span class="stat-unit">+</span></div>
+    <div class="stat-label">代码行数</div>
+  </div>
+  <div class="stat-card" data-target="21" data-suffix="" data-label="核心 Prompt 数">
+    <div class="stat-icon">💬</div>
+    <div class="stat-number"><span class="stat-count">0</span><span class="stat-unit"></span></div>
+    <div class="stat-label">核心 Prompt 数</div>
+  </div>
+  <div class="stat-card" data-target="30" data-suffix="+" data-label="内置工具数">
+    <div class="stat-icon">🔧</div>
+    <div class="stat-number"><span class="stat-count">0</span><span class="stat-unit">+</span></div>
+    <div class="stat-label">内置工具数</div>
+  </div>
+  <div class="stat-card" data-target="57" data-suffix="MB" data-label="Source Map 大小">
+    <div class="stat-icon">📦</div>
+    <div class="stat-number"><span class="stat-count">0</span><span class="stat-unit">MB</span></div>
+    <div class="stat-label">Source Map 大小</div>
+  </div>
+  <div class="stat-card" data-target="8000" data-suffix="+" data-label="DMCA 删除通知">
+    <div class="stat-icon">⚖️</div>
+    <div class="stat-number"><span class="stat-count">0</span><span class="stat-unit">+</span></div>
+    <div class="stat-label">DMCA 删除通知</div>
+  </div>
+</div>
+
+<script>
+function initStatsAnimation() {
+  const cards = document.querySelectorAll('#page-overview .stat-card');
+  if (!cards.length) { setTimeout(initStatsAnimation, 50); return; }
+
+  function formatNumber(n) {
+    if (n >= 1000) return n.toLocaleString('en-US');
+    return String(n);
+  }
+
+  function animateCount(el, target, duration) {
+    const start = performance.now();
+    function update(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(eased * target);
+      el.textContent = formatNumber(current);
+      if (progress < 1) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const card = entry.target;
+      const target = parseInt(card.dataset.target);
+      const countEl = card.querySelector('.stat-count');
+      animateCount(countEl, target, 1200);
+      observer.unobserve(card);
+    });
+  }, { threshold: 0.3 });
+
+  cards.forEach(card => observer.observe(card));
+}
+initStatsAnimation();
+</script>
+
+<h2 id="what-is">什么是 Claude Code</h2>
+<p>Claude Code 是 Anthropic 官方出品的 CLI 工具，让开发者可以在终端中与 Claude 协作完成软件工程任务——编辑文件、执行命令、搜索代码库、协调复杂工作流。</p>
+<p>它不是一个简单的聊天包装器，而是一个完整的 <strong>Agentic 系统</strong>：Claude 可以主动调用工具、递归执行多步任务、管理子 Agent、并在上下文耗尽时自动压缩对话。</p>
+
+<h2 id="exposure">源码来源</h2>
+<div class="callout warning">
+  <p><strong>背景：</strong> 2026-03-31，安全研究者 <a href="https://x.com/Fried_rice" style="color:#79c0ff">@Fried_rice</a> 发现 Claude Code npm 包中存在 <code>.map</code> source map 文件，其中包含指向 Anthropic R2 存储桶的 TypeScript 源码路径，导致完整源码可被公开下载。</p>
+</div>
+<table>
+  <tr><th>属性</th><th>值</th></tr>
+  <tr><td>语言</td><td>TypeScript（strict 模式）</td></tr>
+  <tr><td>运行时</td><td>Bun</td></tr>
+  <tr><td>终端 UI</td><td>React + Ink（自定义终端渲染框架）</td></tr>
+  <tr><td>规模</td><td>~1,900 文件，512,000+ 行代码</td></tr>
+  <tr><td>暴露时间</td><td>2026-03-31</td></tr>
+</table>
+
+<h2 id="tech-stack">技术栈</h2>
+<table>
+  <tr><th>分类</th><th>技术</th></tr>
+  <tr><td>运行时</td><td>Bun</td></tr>
+  <tr><td>语言</td><td>TypeScript (strict)</td></tr>
+  <tr><td>终端 UI</td><td>React + Ink</td></tr>
+  <tr><td>CLI 解析</td><td>Commander.js</td></tr>
+  <tr><td>Schema 验证</td><td>Zod v4</td></tr>
+  <tr><td>代码搜索</td><td>ripgrep</td></tr>
+  <tr><td>协议</td><td>MCP SDK、LSP</td></tr>
+  <tr><td>API</td><td>Anthropic SDK</td></tr>
+  <tr><td>遥测</td><td>OpenTelemetry + gRPC</td></tr>
+  <tr><td>Feature Flags</td><td>GrowthBook</td></tr>
+  <tr><td>认证</td><td>OAuth 2.0、JWT、macOS Keychain</td></tr>
+</table>
+
+<h2 id="capabilities">核心能力</h2>
+<ul>
+  <li><strong>文件操作</strong>：读取、写入、编辑（精确字符串替换）、搜索文件内容</li>
+  <li><strong>Shell 执行</strong>：在用户 shell 环境中运行任意命令，支持后台执行</li>
+  <li><strong>Web 访问</strong>：抓取网页内容、执行搜索</li>
+  <li><strong>Agent 编排</strong>：生成子 Agent 处理独立子任务，支持并行执行</li>
+  <li><strong>MCP 集成</strong>：连接外部 MCP 服务器，扩展工具能力</li>
+  <li><strong>上下文管理</strong>：自动压缩超长对话，保持会话连续性</li>
+  <li><strong>Skill 系统</strong>：用户可定义可复用的工作流，通过 <code>/skill-name</code> 调用</li>
+  <li><strong>IDE 集成</strong>：通过 Bridge 系统与 VS Code、JetBrains 双向通信</li>
+</ul>
+
+<h2 id="doc-guide">文档导读</h2>
+<p>建议按以下顺序阅读，从整体到细节：</p>
+<ol>
+  <li><strong>整体架构</strong> — 模块划分与文件地图</li>
+  <li><strong>Agent 循环</strong> — 理解 Claude Code 如何驱动 LLM 完成任务（核心）</li>
+  <li><strong>System Prompt 系统</strong> — 理解 Claude 的行为是如何被塑造的（核心）</li>
+  <li><strong>工具系统</strong> — 每个工具的能力边界与 Prompt 设计</li>
+  <li>其他模块按需阅读</li>
+</ol>
+<div class="callout tip">
+  <p><strong>提示：</strong> 文档中带 <span style="color:#79c0ff">📋</span> 图标的按钮可展开对应的原始 Prompt，这是 Claude Code 能力的直接来源。</p>
+</div>

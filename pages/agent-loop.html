@@ -1,0 +1,366 @@
+<h1>Agent 循环</h1>
+<p class="subtitle"><code>query.ts</code> 是 Claude Code 的心脏。每次用户输入都会触发一个循环：构建 Prompt → 调用 API → 执行工具 → 递归，直到任务完成。</p>
+
+<h2 id="loop-overview">循环概览</h2>
+<p>整个 Agent 循环由 <code>query()</code> 函数驱动，它是一个异步生成器（<code>AsyncGenerator</code>），向上层持续 yield 事件流（流式文本、工具调用、消息等），直到返回一个 <code>Terminal</code> 终止信号。</p>
+<pre><code>// query.ts
+export async function* query(params: QueryParams): AsyncGenerator&lt;...&gt; {
+  const terminal = yield* queryLoop(params, consumedCommandUuids)
+  return terminal
+}</code></pre>
+
+<h2 id="loop-flow">完整数据流</h2>
+
+<!-- ── Agent Loop SVG Diagram ── -->
+<div class="agent-loop-diagram">
+  <div class="loop-diagram-controls">
+    <button class="loop-play-btn" id="loopPlayBtn">播放动画</button>
+    <span class="loop-step-label" id="loopStepLabel">点击播放，逐步演示循环过程</span>
+  </div>
+  <svg id="agentLoopSvg" viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg" class="loop-svg">
+    <defs>
+      <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#388bfd"/>
+      </marker>
+      <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#3fb950"/>
+      </marker>
+      <marker id="arrowRed" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#f85149"/>
+      </marker>
+      <marker id="arrowGray" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#484f58"/>
+      </marker>
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+
+    <!-- User Input (top) -->
+    <g class="loop-node" id="node-user">
+      <rect x="290" y="20" width="180" height="44" rx="22" fill="#21262d" stroke="#484f58" stroke-width="1.5"/>
+      <text x="380" y="37" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">用户输入</text>
+      <text x="380" y="53" text-anchor="middle" fill="#cdd6f4" font-size="12" font-weight="600">User Message</text>
+    </g>
+
+    <!-- Arrow: User → Step1 -->
+    <line class="loop-arrow" id="arrow-user-1" x1="380" y1="64" x2="380" y2="106" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
+
+    <!-- Step 1: Preprocess -->
+    <g class="loop-node loop-step" id="node-1" data-step="1">
+      <rect x="240" y="108" width="280" height="72" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="380" y="130" text-anchor="middle" fill="#8b949e" font-size="11">① 预处理</text>
+      <text x="380" y="148" text-anchor="middle" fill="#cdd6f4" font-size="12.5" font-weight="600">applyToolResultBudget</text>
+      <text x="380" y="166" text-anchor="middle" fill="#8b949e" font-size="11">microcompact / autocompact</text>
+    </g>
+
+    <!-- Arrow: Step1 → Step2 -->
+    <line class="loop-arrow" id="arrow-1-2" x1="380" y1="180" x2="380" y2="218" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
+
+    <!-- Step 2: Build Request -->
+    <g class="loop-node loop-step" id="node-2" data-step="2">
+      <rect x="240" y="220" width="280" height="72" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="380" y="242" text-anchor="middle" fill="#8b949e" font-size="11">② 构建请求</text>
+      <text x="380" y="260" text-anchor="middle" fill="#cdd6f4" font-size="12.5" font-weight="600">appendSystemContext</text>
+      <text x="380" y="278" text-anchor="middle" fill="#8b949e" font-size="11">messages · tools · model · thinkingConfig</text>
+    </g>
+
+    <!-- Arrow: Step2 → Step3 -->
+    <line class="loop-arrow" id="arrow-2-3" x1="380" y1="292" x2="380" y2="330" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
+
+    <!-- Step 3: Call API -->
+    <g class="loop-node loop-step" id="node-3" data-step="3">
+      <rect x="240" y="332" width="280" height="72" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="380" y="354" text-anchor="middle" fill="#8b949e" font-size="11">③ 调用 API（流式）</text>
+      <text x="380" y="372" text-anchor="middle" fill="#cdd6f4" font-size="12.5" font-weight="600">deps.callModel()</text>
+      <text x="380" y="390" text-anchor="middle" fill="#8b949e" font-size="11">text → yield UI · tool_use → 队列 · thinking → 透传</text>
+    </g>
+
+    <!-- Arrow: Step3 → Step4 -->
+    <line class="loop-arrow" id="arrow-3-4" x1="380" y1="404" x2="380" y2="442" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
+
+    <!-- Step 4: Execute Tools -->
+    <g class="loop-node loop-step" id="node-4" data-step="4">
+      <rect x="240" y="444" width="280" height="60" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="380" y="466" text-anchor="middle" fill="#8b949e" font-size="11">④ 执行工具</text>
+      <text x="380" y="484" text-anchor="middle" fill="#cdd6f4" font-size="12.5" font-weight="600">canUseTool() → runTools()</text>
+    </g>
+
+    <!-- Decision diamond -->
+    <g class="loop-node loop-step" id="node-5" data-step="5">
+      <polygon points="620,474 680,500 620,526 560,500" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="620" y="496" text-anchor="middle" fill="#8b949e" font-size="10">tool_use?</text>
+      <text x="620" y="510" text-anchor="middle" fill="#cdd6f4" font-size="11" font-weight="600">继续？</text>
+    </g>
+
+    <!-- Arrow: Step4 → Decision -->
+    <line class="loop-arrow" id="arrow-4-5" x1="520" y1="474" x2="558" y2="492" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
+
+    <!-- Loop back arrow: Decision → Step1 (YES) -->
+    <path class="loop-arrow" id="arrow-loop" d="M620,474 L620,144 L522,144" fill="none" stroke="#3fb950" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowGreen)" opacity="0"/>
+    <text class="loop-label" id="label-loop" x="660" y="310" fill="#3fb950" font-size="11" text-anchor="middle" opacity="0">有工具调用</text>
+    <text class="loop-label" id="label-loop2" x="660" y="324" fill="#3fb950" font-size="11" text-anchor="middle" opacity="0">→ 下一轮</text>
+
+    <!-- Terminal arrow: Decision → Terminal (NO) -->
+    <line class="loop-arrow" id="arrow-terminal" x1="680" y1="500" x2="730" y2="500" stroke="#f85149" stroke-width="2" marker-end="url(#arrowRed)" opacity="0"/>
+    <g id="node-terminal" opacity="0">
+      <rect x="732" y="482" width="24" height="36" rx="4" fill="#f85149" opacity="0.15" stroke="#f85149" stroke-width="1.5"/>
+      <text x="744" y="496" text-anchor="middle" fill="#f85149" font-size="9">END</text>
+      <text x="744" y="510" text-anchor="middle" fill="#f85149" font-size="8">Terminal</text>
+    </g>
+
+    <!-- YES/NO labels on diamond -->
+    <text id="label-yes" x="620" y="468" text-anchor="middle" fill="#3fb950" font-size="10" opacity="0">YES ↑</text>
+    <text id="label-no" x="700" y="498" text-anchor="middle" fill="#f85149" font-size="10" opacity="0">NO →</text>
+  </svg>
+</div>
+
+<!-- Step detail cards (shown below diagram during animation) -->
+<div class="loop-detail-cards">
+  <div class="loop-detail-card" id="detail-1">
+    <div class="loop-detail-title">① 预处理</div>
+    <ul>
+      <li><code>applyToolResultBudget()</code> — 裁剪超大 tool result，防止 prompt 爆炸</li>
+      <li><code>microcompact()</code> — 针对单条消息的轻量压缩</li>
+      <li><code>autocompact()</code> — 上下文超限时触发全量摘要压缩 <span class="tag tag-yellow">按需</span></li>
+    </ul>
+  </div>
+  <div class="loop-detail-card" id="detail-2">
+    <div class="loop-detail-title">② 构建请求</div>
+    <ul>
+      <li><code>appendSystemContext(systemPrompt, systemContext)</code> — 组装最终 System Prompt</li>
+      <li><code>prependUserContext(messages, userContext)</code> — 注入用户上下文</li>
+      <li>构建 API 参数：<code>messages</code>、<code>tools</code>、<code>model</code>、<code>thinkingConfig</code> 等</li>
+    </ul>
+  </div>
+  <div class="loop-detail-card" id="detail-3">
+    <div class="loop-detail-title">③ 调用 API <span class="tag tag-blue">流式</span></div>
+    <ul>
+      <li><code>deps.callModel()</code> → 返回异步流</li>
+      <li>text block → 实时 yield 给 UI 渲染</li>
+      <li>tool_use block → 收集到 <code>toolUseBlocks</code> 队列</li>
+      <li>thinking block → 透传（需遵守 thinking 三条铁律）</li>
+    </ul>
+  </div>
+  <div class="loop-detail-card" id="detail-4">
+    <div class="loop-detail-title">④ 执行工具</div>
+    <ul>
+      <li><code>canUseTool()</code> 权限检查 → 通过 / 拒绝 / 弹窗询问</li>
+      <li>工具执行：<code>runTools()</code> 或 <code>StreamingToolExecutor</code></li>
+      <li>生成 <code>tool_result</code> 消息追加到 messages</li>
+    </ul>
+  </div>
+  <div class="loop-detail-card" id="detail-5">
+    <div class="loop-detail-title">⑤ 判断是否继续</div>
+    <ul>
+      <li><span class="tag tag-green">有 tool_use</span> → 回到 ① 继续下一轮（绿色虚线箭头）</li>
+      <li><span class="tag tag-red">无 tool_use</span> → 返回 <code>Terminal</code>，循环结束</li>
+      <li>达到 <code>maxTurns</code> → 强制终止</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+function initAgentLoop() {
+  var btn = document.getElementById('loopPlayBtn');
+  if (!btn) { setTimeout(initAgentLoop, 50); return; }
+
+  const steps = [
+    { nodeId: 'node-1', arrowIn: 'arrow-user-1', detailId: 'detail-1', label: '① 预处理：裁剪 tool result，压缩上下文' },
+    { nodeId: 'node-2', arrowIn: 'arrow-1-2',    detailId: 'detail-2', label: '② 构建请求：组装 System Prompt + 参数' },
+    { nodeId: 'node-3', arrowIn: 'arrow-2-3',    detailId: 'detail-3', label: '③ 调用 API：流式获取响应，收集 tool_use' },
+    { nodeId: 'node-4', arrowIn: 'arrow-3-4',    detailId: 'detail-4', label: '④ 执行工具：权限检查，运行，生成 tool_result' },
+    { nodeId: 'node-5', arrowIn: 'arrow-4-5',    detailId: 'detail-5', label: '⑤ 判断：有 tool_use → 继续循环；无 → 结束' },
+  ];
+
+  const ACTIVE_STROKE = { '1':'#388bfd','2':'#388bfd','3':'#388bfd','4':'#388bfd','5':'#d29922' };
+  const ACTIVE_TEXT   = { '1':'#79c0ff','2':'#79c0ff','3':'#79c0ff','4':'#79c0ff','5':'#e3b341' };
+  const ARROW_ACTIVE  = { '1':'#388bfd','2':'#388bfd','3':'#388bfd','4':'#388bfd','5':'#d29922' };
+  const ARROW_MARKER  = { '1':'arrowBlue','2':'arrowBlue','3':'arrowBlue','4':'arrowBlue','5':'arrowGray' };
+
+  let currentStep = 0;
+  let playing = false;
+  let timer = null;
+
+  const playBtn   = document.getElementById('loopPlayBtn');
+  const stepLabel = document.getElementById('loopStepLabel');
+
+  function resetAll() {
+    steps.forEach((s, i) => {
+      const node = document.getElementById(s.nodeId);
+      if (node) {
+        const rect = node.querySelector('rect,polygon');
+        if (rect) { rect.setAttribute('stroke', '#30363d'); rect.removeAttribute('filter'); }
+        const texts = node.querySelectorAll('text');
+        texts.forEach(t => t.setAttribute('fill', t.getAttribute('data-orig-fill') || '#8b949e'));
+      }
+      const arrow = document.getElementById(s.arrowIn);
+      if (arrow) { arrow.setAttribute('stroke', '#484f58'); arrow.setAttribute('opacity', '0.4'); arrow.setAttribute('marker-end', 'url(#arrowGray)'); }
+      const detail = document.getElementById(s.detailId);
+      if (detail) detail.classList.remove('active');
+    });
+    // hide loop/terminal
+    ['arrow-loop','label-loop','label-loop2','arrow-terminal','node-terminal','label-yes','label-no'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.setAttribute('opacity','0');
+    });
+    stepLabel.textContent = '点击播放，逐步演示循环过程';
+  }
+
+  function activateStep(stepIndex) {
+    const s = steps[stepIndex];
+    const sNum = String(stepIndex + 1);
+
+    // Activate node
+    const node = document.getElementById(s.nodeId);
+    if (node) {
+      const rect = node.querySelector('rect,polygon');
+      if (rect) {
+        rect.setAttribute('stroke', ACTIVE_STROKE[sNum]);
+        rect.setAttribute('filter', 'url(#glow)');
+      }
+    }
+
+    // Activate incoming arrow
+    const arrow = document.getElementById(s.arrowIn);
+    if (arrow) {
+      arrow.setAttribute('stroke', ARROW_ACTIVE[sNum]);
+      arrow.setAttribute('opacity', '1');
+      arrow.setAttribute('marker-end', `url(#${ARROW_MARKER[sNum]})`);
+    }
+
+    // Show detail card
+    const detail = document.getElementById(s.detailId);
+    if (detail) detail.classList.add('active');
+
+    // Step 5 extras: show YES/NO and loop/terminal
+    if (stepIndex === 4) {
+      setTimeout(() => {
+        ['label-yes','label-no'].forEach(id => document.getElementById(id)?.setAttribute('opacity','1'));
+        setTimeout(() => {
+          ['arrow-loop','label-loop','label-loop2'].forEach(id => document.getElementById(id)?.setAttribute('opacity','1'));
+          setTimeout(() => {
+            ['arrow-terminal','node-terminal'].forEach(id => document.getElementById(id)?.setAttribute('opacity','1'));
+          }, 600);
+        }, 400);
+      }, 300);
+    }
+
+    stepLabel.textContent = s.label;
+  }
+
+  function nextStep() {
+    if (currentStep < steps.length) {
+      activateStep(currentStep);
+      currentStep++;
+      if (currentStep >= steps.length) {
+        playBtn.textContent = '重新播放';
+        playing = false;
+      }
+    }
+  }
+
+  function startAuto() {
+    playing = true;
+    playBtn.textContent = '暂停';
+    timer = setInterval(() => {
+      if (currentStep >= steps.length) {
+        clearInterval(timer);
+        playing = false;
+        playBtn.textContent = '重新播放';
+        return;
+      }
+      nextStep();
+    }, 900);
+  }
+
+  playBtn.addEventListener('click', () => {
+    if (playBtn.textContent === '重新播放') {
+      resetAll();
+      currentStep = 0;
+      startAuto();
+      return;
+    }
+    if (playing) {
+      clearInterval(timer);
+      playing = false;
+      playBtn.textContent = '继续';
+    } else {
+      startAuto();
+    }
+  });
+
+  // Save original text colors
+  document.querySelectorAll('#agentLoopSvg text').forEach(t => {
+    t.setAttribute('data-orig-fill', t.getAttribute('fill') || '#8b949e');
+  });
+}
+initAgentLoop();
+</script>
+
+<h2 id="query-params">QueryParams 入参结构</h2>
+<pre><code>type QueryParams = {
+  messages: Message[]          // 当前对话历史
+  systemPrompt: SystemPrompt   // 系统提示词
+  userContext: { [k: string]: string }    // 注入用户上下文
+  systemContext: { [k: string]: string }  // 注入系统上下文
+  canUseTool: CanUseToolFn     // 权限检查函数
+  toolUseContext: ToolUseContext
+  fallbackModel?: string       // 降级模型
+  querySource: QuerySource     // 来源标识（repl/agent/compact...）
+  maxTurns?: number            // 最大递归轮数
+  taskBudget?: { total: number } // token 预算
+}</code></pre>
+
+<h2 id="loop-state">循环内部状态</h2>
+<p>每次迭代开始时从 <code>state</code> 对象解构，continue 时整体替换，避免多个变量单独赋值：</p>
+<pre><code>type State = {
+  messages: Message[]
+  toolUseContext: ToolUseContext
+  autoCompactTracking: AutoCompactTrackingState | undefined
+  maxOutputTokensRecoveryCount: number  // 超 token 恢复计数
+  turnCount: number
+  pendingToolUseSummary: Promise&lt;...&gt; | undefined
+  transition: Continue | undefined      // 上一次迭代的 continue 原因
+}</code></pre>
+
+<h2 id="tool-execution">工具执行机制</h2>
+<p>工具执行有两种模式，由 feature flag <code>streamingToolExecution</code> 控制：</p>
+<table>
+  <tr><th>模式</th><th>实现</th><th>特点</th></tr>
+  <tr><td>标准模式</td><td><code>runTools()</code></td><td>等待流式响应完成后批量执行所有工具</td></tr>
+  <tr><td>流式模式</td><td><code>StreamingToolExecutor</code></td><td>流式响应中一旦工具参数完整即立即执行，降低延迟</td></tr>
+</table>
+<p>每个工具执行前都经过 <code>canUseTool()</code> 权限检查。若用户拒绝，循环会生成一条错误 <code>tool_result</code> 继续，而不是中断。</p>
+
+<h2 id="error-recovery">错误恢复机制</h2>
+<p>循环内置多种错误恢复路径：</p>
+<ul>
+  <li><strong>max_output_tokens</strong>：输出 token 超限时，最多重试 <code>MAX_OUTPUT_TOKENS_RECOVERY_LIMIT</code>（3次）次，每次减少请求的 max_tokens</li>
+  <li><strong>prompt_too_long</strong>：触发 autocompact 压缩后重试；若压缩失败则返回 <code>blocking_limit</code> 终止</li>
+  <li><strong>Streaming fallback</strong>：流式调用失败时，向已有的 assistantMessages 发送 tombstone（墓碑消息）让 UI 清除，然后用非流式重试</li>
+  <li><strong>FallbackTriggeredError</strong>：主模型失败时降级到 <code>fallbackModel</code> 重试</li>
+</ul>
+
+<h2 id="thinking-rules">Thinking 模式规则</h2>
+<div class="callout warning">
+  <p><strong>三条铁律（代码注释原文称之为"wizard rules"）：</strong></p>
+</div>
+<ol>
+  <li>包含 <code>thinking</code> 或 <code>redacted_thinking</code> block 的消息，所在请求的 <code>max_thinking_length</code> 必须 &gt; 0</li>
+  <li>thinking block 不能是消息的最后一个 block</li>
+  <li>thinking block 必须在整个 assistant trajectory 中保持完整——包括同一轮的 tool_use block、后续的 tool_result，以及下一条 assistant 消息</li>
+</ol>
+
+<h2 id="system-prompt-in-loop">System Prompt 的组装时机</h2>
+<p>每次迭代开始时调用：</p>
+<pre><code>const fullSystemPrompt = asSystemPrompt(
+  appendSystemContext(systemPrompt, systemContext)
+)</code></pre>
+<p>System Prompt 本身在循环外构建（通过 <code>getSystemPrompt()</code>），循环内只做 <code>systemContext</code> 的追加。详见下一章。</p>
+
+<button class="prompt-trigger" data-prompt="query-flow">
+  <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8V1.5Z"/></svg>
+  查看 Compact Prompt（上下文压缩提示词）
+</button>

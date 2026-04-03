@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claude Code 源码解析</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<div id="sidebar-wrapper">
+  <button id="sidebar-toggle" title="收起导航">
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06L7.28 12.78a.75.75 0 0 1-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06z"/></svg>
+  </button>
+  <aside id="sidebar">
+  <div class="logo">
+    <h2>Claude Code 源码解析</h2>
+    <p>~1,900 files · 512,000+ lines · TypeScript</p>
+  </div>
+  <nav>
+    <ul>
+      <li><a href="#" data-page="overview" class="active">项目概览</a></li>
+      <li><a href="#" data-page="architecture">整体架构</a></li>
+      <li><a href="#" data-page="agent-loop">Agent 循环</a></li>
+      <li><a href="#" data-page="system-prompt">System Prompt 系统</a></li>
+      <li><a href="#" data-page="tools">工具系统（Tools）</a></li>
+      <li><a href="#" data-page="cli">CLI 交互层</a></li>
+      <li><a href="#" data-page="api">LLM API 层</a></li>
+      <li><a href="#" data-page="swarm">Agent 群集（Swarm）</a></li>
+      <li><a href="#" data-page="compact">记忆与上下文管理</a></li>
+      <li><a href="#" data-page="mcp">MCP 集成</a></li>
+      <li><a href="#" data-page="prompts">Prompt 全览</a></li>
+    </ul>
+  </nav>
+  </aside>
+  <div id="sidebar-resize-handle"></div>
+</div>
+
+<!-- ── Main ── -->
+<div id="main">
+  <div id="content">
+    <section class="page-section active" id="page-overview"><div class="page-loading">加载中...</div></section>
+    <section class="page-section" id="page-architecture"></section>
+    <section class="page-section" id="page-agent-loop"></section>
+    <section class="page-section" id="page-system-prompt"></section>
+    <section class="page-section" id="page-tools"></section>
+    <section class="page-section" id="page-cli"></section>
+    <section class="page-section" id="page-api"></section>
+    <section class="page-section" id="page-swarm"></section>
+    <section class="page-section" id="page-compact"></section>
+    <section class="page-section" id="page-mcp"></section>
+    <section class="page-section" id="page-prompts"></section>
+  </div><!-- /#content -->
+
+  <!-- ── Right TOC ── -->
+  <div id="toc-wrapper">
+    <div id="toc-resize-handle"></div>
+    <button id="toc-toggle" title="收起目录">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06L7.28 12.78a.75.75 0 0 1-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06z"/></svg>
+    </button>
+    <aside id="toc">
+      <h4>本页目录</h4>
+      <ul id="toc-list">
+        <li><a href="#">加载中...</a></li>
+      </ul>
+    </aside>
+  </div>
+</div><!-- /#main -->
+
+<!-- ── Prompt Drawer ── -->
+<div id="drawer-overlay"></div>
+<div id="drawer">
+  <div id="drawer-header">
+    <div>
+      <div id="drawer-title">Prompt</div>
+      <div id="drawer-source"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div id="drawer-lang">
+        <button class="lang-btn active" data-lang="en">EN</button>
+        <button class="lang-btn" data-lang="zh">中文</button>
+      </div>
+      <button id="drawer-close" title="关闭">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div id="drawer-body">
+    <pre id="drawer-content"></pre>
+  </div>
+  <div id="drawer-copy">
+    <div id="drawer-lang-note" style="font-size:11px;color:#8b949e;display:none">⚠️ 中文为机器翻译，仅供参考</div>
+    <button id="copy-btn">复制内容</button>
+  </div>
+</div>
+
+<script src="prompts.js"></script>
+<script>
+// ── Page loader ──
+const pageCache = {};
+
+async function loadPage(pageId) {
+  if (pageCache[pageId]) return pageCache[pageId];
+  try {
+    const res = await fetch(`pages/${pageId}.html`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const html = await res.text();
+    pageCache[pageId] = html;
+    return html;
+  } catch (e) {
+    return `<p style="color:#d29922">页面加载失败：${e.message}</p>`;
+  }
+}
+
+// ── Navigation ──
+const navLinks = document.querySelectorAll('#sidebar nav a[data-page]');
+const sections = document.querySelectorAll('.page-section');
+
+function runPageScripts(section) {
+  section.querySelectorAll('script').forEach(oldScript => {
+    const newScript = document.createElement('script');
+    newScript.textContent = oldScript.textContent;
+    document.head.appendChild(newScript);
+  });
+}
+
+async function navigateTo(pageId, pushState = true) {
+  // Load content if not yet loaded
+  const section = document.getElementById('page-' + pageId);
+  if (section && !pageCache[pageId]) {
+    const html = await loadPage(pageId);
+    section.innerHTML = html;
+    pageCache[pageId] = html; // mark as loaded
+    runPageScripts(section);
+    section.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+  }
+
+  sections.forEach(s => s.classList.remove('active'));
+  navLinks.forEach(a => a.classList.remove('active'));
+  if (section) section.classList.add('active');
+  const link = document.querySelector(`[data-page="${pageId}"]`);
+  if (link) link.classList.add('active');
+  buildToc(section);
+  if (pushState) history.pushState({ page: pageId }, '', '#' + pageId);
+}
+
+navLinks.forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    navigateTo(link.dataset.page);
+  });
+});
+
+// 浏览器前进/后退
+window.addEventListener('popstate', e => {
+  const pageId = e.state?.page || 'overview';
+  navigateTo(pageId, false);
+});
+
+// 刷新后恢复
+const initPage = location.hash.replace('#', '') || 'overview';
+navigateTo(initPage, false);
+
+// ── TOC Builder ──
+function buildToc(section) {
+  const toc = document.getElementById('toc-list');
+  if (!section) return;
+  const headings = section.querySelectorAll('h2, h3');
+  if (headings.length === 0) { toc.innerHTML = '<li><em style="color:#8b949e;font-size:12px">暂无目录</em></li>'; return; }
+  toc.innerHTML = '';
+  headings.forEach(h => {
+    if (!h.id) h.id = h.textContent.trim().replace(/\s+/g, '-').replace(/[^\w\-\u4e00-\u9fa5]/g, '');
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+    if (h.tagName === 'H3') li.style.paddingLeft = '12px';
+    li.appendChild(a);
+    toc.appendChild(li);
+  });
+}
+
+// ── Drawer ──
+const drawer = document.getElementById('drawer');
+const overlay = document.getElementById('drawer-overlay');
+const drawerTitle = document.getElementById('drawer-title');
+const drawerSource = document.getElementById('drawer-source');
+const drawerContent = document.getElementById('drawer-content');
+
+// ── Drawer state ──
+let currentPromptKey = null;
+let currentLang = 'en';
+
+function renderDrawerContent() {
+  if (!currentPromptKey) return;
+  const data = PROMPTS[currentPromptKey];
+  if (!data) return;
+  const isZh = currentLang === 'zh';
+  drawerContent.textContent = isZh && data.contentZh ? data.contentZh : data.content;
+  document.getElementById('drawer-lang-note').style.display = isZh ? 'block' : 'none';
+}
+
+function openDrawer(key) {
+  const data = PROMPTS[key];
+  if (!data) return;
+  currentPromptKey = key;
+  drawerTitle.textContent = data.title;
+  drawerSource.textContent = data.source;
+  renderDrawerContent();
+  drawer.classList.add('open');
+  overlay.classList.add('open');
+}
+
+function closeDrawer() {
+  drawer.classList.remove('open');
+  overlay.classList.remove('open');
+}
+
+document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+overlay.addEventListener('click', closeDrawer);
+
+document.getElementById('copy-btn').addEventListener('click', () => {
+  navigator.clipboard.writeText(drawerContent.textContent).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '已复制！';
+    setTimeout(() => btn.textContent = '复制内容', 1500);
+  });
+});
+
+// Language toggle
+document.querySelectorAll('.lang-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentLang = btn.dataset.lang;
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderDrawerContent();
+  });
+});
+
+// Delegate prompt trigger clicks (works for dynamically loaded content)
+document.addEventListener('click', e => {
+  const trigger = e.target.closest('.prompt-trigger');
+  if (trigger) openDrawer(trigger.dataset.prompt);
+});
+
+
+// ── Sidebar Toggle ──
+const sidebarWrapper = document.getElementById('sidebar-wrapper');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+sidebarToggle.addEventListener('click', () => {
+  sidebarWrapper.classList.toggle('collapsed');
+  sidebarToggle.title = sidebarWrapper.classList.contains('collapsed') ? '展开导航' : '收起导航';
+});
+
+// ── TOC Toggle ──
+const tocWrapper = document.getElementById('toc-wrapper');
+const tocToggle = document.getElementById('toc-toggle');
+tocToggle.addEventListener('click', () => {
+  tocWrapper.classList.toggle('collapsed');
+  tocToggle.title = tocWrapper.classList.contains('collapsed') ? '展开目录' : '收起目录';
+});
+
+// ── Generic Resize Helper ──
+function makeResizable({ handle, wrapper, direction, min, max }) {
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  handle.addEventListener('mousedown', e => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = wrapper.offsetWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    wrapper.style.transition = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!isResizing) return;
+    const delta = direction === 'right'
+      ? e.clientX - startX
+      : startX - e.clientX;
+    const newWidth = Math.min(max, Math.max(min, startWidth + delta));
+    wrapper.style.width = newWidth + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!isResizing) return;
+    isResizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    wrapper.style.transition = '';
+  });
+}
+
+makeResizable({
+  handle: document.getElementById('sidebar-resize-handle'),
+  wrapper: sidebarWrapper,
+  direction: 'right',
+  min: 160,
+  max: 480,
+});
+
+makeResizable({
+  handle: document.getElementById('toc-resize-handle'),
+  wrapper: tocWrapper,
+  direction: 'left',
+  min: 120,
+  max: 360,
+});
+</script>
+</body>
+</html>

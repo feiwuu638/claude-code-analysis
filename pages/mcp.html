@@ -1,0 +1,111 @@
+<h1>MCP 集成</h1>
+<p class="subtitle">Model Context Protocol（MCP）是 Anthropic 推出的开放标准，让 Claude Code 能够连接外部服务、数据库、API，动态扩展工具能力。</p>
+
+<h2 id="mcp-what">什么是 MCP</h2>
+<p>MCP 定义了一套标准协议，让 AI 模型可以通过统一接口调用外部工具（Tools）、读取外部资源（Resources）、使用预设提示词（Prompts）。Claude Code 作为 MCP 客户端，连接用户配置的 MCP server，将其工具动态注入到 Agent 的工具集中。</p>
+
+<h2 id="mcp-transports">传输协议</h2>
+<p>MCP server 支持多种传输方式：</p>
+<table>
+  <tr><th>传输类型</th><th>说明</th><th>适用场景</th></tr>
+  <tr><td><code>stdio</code></td><td>通过标准输入输出与子进程通信</td><td>本地命令行工具（最常用）</td></tr>
+  <tr><td><code>sse</code></td><td>Server-Sent Events，HTTP 长连接</td><td>远程 HTTP server</td></tr>
+  <tr><td><code>http</code></td><td>Streamable HTTP（新标准）</td><td>现代远程 server</td></tr>
+  <tr><td><code>ws</code></td><td>WebSocket</td><td>需要双向实时通信</td></tr>
+  <tr><td><code>sdk</code></td><td>直接 SDK 集成</td><td>内置 MCP server</td></tr>
+</table>
+
+<h2 id="mcp-config">配置方式</h2>
+<p>MCP server 在 <code>settings.json</code> 中配置，支持多个作用域：</p>
+<pre><code>// ~/.claude/settings.json 或项目 .claude/settings.json
+{
+  "mcpServers": {
+    "my-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@my-org/my-mcp-server"],
+      "env": { "API_KEY": "..." }
+    },
+    "remote-server": {
+      "type": "sse",
+      "url": "https://my-server.example.com/sse"
+    }
+  }
+}</code></pre>
+<p>配置作用域优先级（高到低）：<code>enterprise</code> → <code>managed</code> → <code>project</code> → <code>user</code> → <code>local</code></p>
+
+<h2 id="mcp-lifecycle">连接生命周期</h2>
+<div class="flow">
+  <div class="flow-step">
+    <div class="flow-step-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
+    <div class="flow-card">
+      <div class="flow-card-title">① 启动连接</div>
+      <ul class="flow-card-items">
+        <li><code>connectToServer()</code> 根据传输类型创建对应 transport</li>
+        <li>stdio server：fork 子进程，通过 stdin/stdout 通信</li>
+        <li>HTTP/SSE server：建立 HTTP 连接，处理认证（OAuth / API Key）</li>
+      </ul>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
+    <div class="flow-card">
+      <div class="flow-card-title">② 能力协商</div>
+      <ul class="flow-card-items">
+        <li><code>fetchToolsForClient()</code> 获取 server 提供的工具列表</li>
+        <li>获取 server 的 <code>instructions</code>（注入 System Prompt 的 MCP 指令段落）</li>
+        <li>获取可用资源列表（Resources）</li>
+      </ul>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
+    <div class="flow-card">
+      <div class="flow-card-title">③ 工具注入</div>
+      <ul class="flow-card-items">
+        <li>MCP 工具被包装为 <code>MCPTool</code> 实例，加入 Agent 的工具集</li>
+        <li>工具名称格式：<code>mcp__serverName__toolName</code></li>
+        <li>Server instructions 注入 System Prompt 的 <code>mcp_instructions</code> 段落</li>
+      </ul>
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-left"><div class="flow-dot"></div></div>
+    <div class="flow-card">
+      <div class="flow-card-title">④ 工具调用</div>
+      <ul class="flow-card-items">
+        <li>Claude 调用 MCP 工具时，<code>MCPTool.call()</code> 通过 MCP 协议转发给 server</li>
+        <li>server 执行并返回结果（文本、图片、资源引用等）</li>
+        <li>支持流式进度更新（<code>MCPProgress</code>）</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 id="mcp-auth">认证机制</h2>
+<p>MCP server 支持多种认证方式：</p>
+<ul>
+  <li><strong>OAuth 2.0</strong>：支持标准 OAuth 流程，token 存储在 macOS Keychain，自动刷新</li>
+  <li><strong>Cross-App Access（XAA）</strong>：企业级跨应用授权，通过 IdP 统一管理</li>
+  <li><strong>API Key</strong>：通过 <code>env</code> 配置传入环境变量</li>
+  <li><strong>无认证</strong>：本地 stdio server 通常不需要认证</li>
+</ul>
+
+<h2 id="mcp-resources">Resources 与 Prompts</h2>
+<p>除工具外，MCP server 还可以提供：</p>
+<ul>
+  <li><strong>Resources</strong>：可读取的数据源（文件、数据库记录、API 响应等），通过 <code>ListMcpResources</code> 和 <code>ReadMcpResource</code> 工具访问</li>
+  <li><strong>Prompts</strong>：预设提示词模板，可通过 <code>/mcp</code> 命令查看和使用</li>
+</ul>
+
+<h2 id="mcp-management">MCP 管理命令</h2>
+<p>用户可通过 <code>/mcp</code> 斜杠命令管理 MCP server：</p>
+<ul>
+  <li>查看已连接的 server 列表和状态</li>
+  <li>查看每个 server 提供的工具</li>
+  <li>重新连接断开的 server</li>
+  <li>查看 server 提供的 Prompts</li>
+</ul>
+<div class="callout tip">
+  <p><strong>MCP 的架构意义：</strong> MCP 将 Claude Code 从一个固定能力的工具变成了一个可无限扩展的平台。任何人都可以编写 MCP server，为 Claude 提供访问私有数据库、内部 API、专有工具的能力，而无需修改 Claude Code 本身。</p>
+</div>

@@ -1,0 +1,76 @@
+<h1>CLI 交互层</h1>
+<p class="subtitle">CLI 层负责解析用户输入、处理斜杠命令、渲染终端 UI。它是用户与 Agent 循环之间的桥梁。</p>
+
+<h2 id="cli-entry">程序入口</h2>
+<p><code>main.tsx</code> 是整个程序的入口，基于 Commander.js 解析 CLI 参数。启动时并行触发多个预加载任务以降低冷启动延迟：</p>
+<pre><code>// 在主模块 import 之前作为副作用触发
+startMdmRawRead()        // MDM 企业配置预读
+startKeychainPrefetch()  // macOS Keychain 凭证预读
+// + API 预连接、GrowthBook feature flag 初始化</code></pre>
+<p>参数解析完成后，调用 <code>renderAndRun()</code> 启动 React/Ink 渲染循环，进入交互模式。</p>
+
+<h2 id="slash-commands">斜杠命令系统</h2>
+<p>用户以 <code>/</code> 开头输入的命令由 <code>commands.ts</code> 统一注册和分发。源码中共有约 50 个斜杠命令：</p>
+<table>
+  <tr><th>命令</th><th>功能</th></tr>
+  <tr><td><code>/clear</code></td><td>清空对话历史，重置上下文</td></tr>
+  <tr><td><code>/compact</code></td><td>手动触发上下文压缩</td></tr>
+  <tr><td><code>/commit</code></td><td>创建 git commit（含安全协议）</td></tr>
+  <tr><td><code>/review</code></td><td>代码审查</td></tr>
+  <tr><td><code>/config</code></td><td>查看/修改设置</td></tr>
+  <tr><td><code>/doctor</code></td><td>环境诊断，检查依赖和配置</td></tr>
+  <tr><td><code>/memory</code></td><td>管理持久化 Memory 文件</td></tr>
+  <tr><td><code>/mcp</code></td><td>管理 MCP server 连接</td></tr>
+  <tr><td><code>/skills</code></td><td>管理 Skill 列表</td></tr>
+  <tr><td><code>/tasks</code></td><td>查看当前任务列表</td></tr>
+  <tr><td><code>/resume</code></td><td>恢复上一个会话</td></tr>
+  <tr><td><code>/share</code></td><td>上传会话记录生成分享链接</td></tr>
+  <tr><td><code>/cost</code></td><td>查看本次会话的 token 用量和费用</td></tr>
+  <tr><td><code>/diff</code></td><td>查看当前 git diff</td></tr>
+  <tr><td><code>/theme</code></td><td>切换 UI 主题</td></tr>
+  <tr><td><code>/vim</code></td><td>切换 Vim 输入模式</td></tr>
+  <tr><td><code>/login</code> / <code>/logout</code></td><td>账号认证管理</td></tr>
+  <tr><td><code>/ide</code></td><td>IDE 集成设置</td></tr>
+  <tr><td><code>/desktop</code> / <code>/mobile</code></td><td>切换到桌面/移动端 App</td></tr>
+  <tr><td><code>/context</code></td><td>可视化当前上下文使用情况</td></tr>
+  <tr><td><code>/pr_comments</code></td><td>查看 PR 评论</td></tr>
+  <tr><td><code>/init</code></td><td>初始化项目（生成 CLAUDE.md）</td></tr>
+  <tr><td><code>/help</code></td><td>查看帮助</td></tr>
+</table>
+<div class="callout">
+  <p><strong>Skill 命令：</strong> 用户自定义的 Skill 也以 <code>/skill-name</code> 形式调用，由 <code>SkillTool</code> 执行。Skill 本质上是一段 Markdown 格式的 prompt 模板，被展开后注入到对话中。</p>
+</div>
+
+<h2 id="ink-ui">终端 UI 框架（Ink）</h2>
+<p>Claude Code 使用 React + Ink 构建终端 UI，<code>src/ink/</code> 是对 Ink 的自定义封装，<code>src/components/</code> 包含约 140 个 React 组件。</p>
+<p>Ink 的核心思路是：用 React 的声明式模型描述终端界面，通过 Yoga 布局引擎计算 flexbox 布局，最终输出 ANSI 转义码渲染到终端。</p>
+<table>
+  <tr><th>子目录</th><th>职责</th></tr>
+  <tr><td><code>ink/renderer.ts</code></td><td>核心渲染器，将 React 树转为 ANSI 输出</td></tr>
+  <tr><td><code>ink/layout/</code></td><td>Yoga flexbox 布局引擎集成</td></tr>
+  <tr><td><code>ink/events/</code></td><td>键盘、鼠标事件处理</td></tr>
+  <tr><td><code>ink/termio/</code></td><td>终端 I/O，ANSI 转义码处理</td></tr>
+  <tr><td><code>ink/hooks/</code></td><td>终端相关 React hooks（useInput、useStdout 等）</td></tr>
+  <tr><td><code>components/</code></td><td>对话气泡、工具调用展示、权限弹窗、进度条等 UI 组件</td></tr>
+</table>
+
+<h2 id="permission-modes">权限模式与用户交互</h2>
+<p>在默认模式下，当 Claude 尝试调用危险工具（如写文件、执行命令）时，终端会弹出权限确认框，用户可以选择：</p>
+<ul>
+  <li><strong>允许一次</strong> — 仅本次允许</li>
+  <li><strong>始终允许</strong> — 将该工具加入白名单</li>
+  <li><strong>拒绝</strong> — 拒绝并告知 Claude</li>
+</ul>
+<p>用户也可以通过 <code>--dangerously-skip-permissions</code> 启动参数跳过所有权限检查，进入完全自主模式。</p>
+
+<h2 id="hooks">Hooks 系统</h2>
+<p>用户可以在 <code>settings.json</code> 中配置 hooks，在特定事件发生时执行 shell 命令：</p>
+<pre><code>// 示例：每次工具调用前执行
+{
+  "hooks": {
+    "PreToolUse": [{ "command": "echo 'tool called'" }],
+    "PostToolUse": [{ "command": "notify-send 'done'" }],
+    "SessionStart": [{ "command": "./bootstrap.sh" }]
+  }
+}</code></pre>
+<p>Hook 的输出会作为 <code>&lt;user-prompt-submit-hook&gt;</code> 标签注入到对话中，Claude 会将其视为来自用户的反馈。</p>
