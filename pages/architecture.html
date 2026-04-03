@@ -56,60 +56,60 @@
   <svg viewBox="0 0 680 400" xmlns="http://www.w3.org/2000/svg" class="arch-svg">
     <defs>
       <marker id="archArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-        <path d="M0,0 L0,6 L8,3 z" fill="#484f58"/>
+        <path d="M0,0 L0,6 L8,3 z" fill="#2e4566"/>
       </marker>
     </defs>
 
     <!-- Layer 1: UI -->
-    <rect x="40" y="20" width="600" height="64" rx="8" fill="#1c2128" stroke="#388bfd" stroke-width="1.5"/>
-    <text x="340" y="44" text-anchor="middle" fill="#79c0ff" font-size="13" font-weight="700">用户界面层</text>
-    <text x="340" y="62" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="monospace">CLI (Commander.js)　·　Terminal UI (React + Ink)　·　IDE Bridge</text>
+    <rect x="40" y="20" width="600" height="64" rx="8" fill="#0f1822" stroke="#0099bb" stroke-width="1.5"/>
+    <text x="340" y="44" text-anchor="middle" fill="#00d9ff" font-size="13" font-weight="700">用户界面层</text>
+    <text x="340" y="62" text-anchor="middle" fill="#4a6a8a" font-size="11.5" font-family="monospace">CLI (Commander.js)　·　Terminal UI (React + Ink)　·　IDE Bridge</text>
 
     <!-- Arrow L1→L2 -->
-    <line x1="340" y1="84" x2="340" y2="108" stroke="#484f58" stroke-width="1.5" marker-end="url(#archArrow)"/>
+    <line x1="340" y1="84" x2="340" y2="108" stroke="#2e4566" stroke-width="1.5" marker-end="url(#archArrow)"/>
 
     <!-- Layer 2: Agent Loop -->
-    <rect x="40" y="110" width="600" height="64" rx="8" fill="#1c2128" stroke="#d29922" stroke-width="1.5"/>
-    <text x="340" y="134" text-anchor="middle" fill="#e3b341" font-size="13" font-weight="700">Agent 循环层</text>
-    <text x="340" y="152" text-anchor="middle" fill="#8b949e" font-size="11.5" font-family="monospace">query.ts　·　QueryEngine.ts　·　query/config.ts　·　coordinator/</text>
+    <rect x="40" y="110" width="600" height="64" rx="8" fill="#0f1822" stroke="#cc7a00" stroke-width="1.5"/>
+    <text x="340" y="134" text-anchor="middle" fill="#ffb347" font-size="13" font-weight="700">Agent 循环层</text>
+    <text x="340" y="152" text-anchor="middle" fill="#4a6a8a" font-size="11.5" font-family="monospace">query.ts　·　QueryEngine.ts　·　query/config.ts　·　coordinator/</text>
 
     <!-- Arrows L2→L3 (three branches) -->
-    <line x1="150" y1="174" x2="150" y2="208" stroke="#484f58" stroke-width="1.5" marker-end="url(#archArrow)"/>
-    <line x1="340" y1="174" x2="340" y2="208" stroke="#484f58" stroke-width="1.5" marker-end="url(#archArrow)"/>
-    <line x1="530" y1="174" x2="530" y2="208" stroke="#484f58" stroke-width="1.5" marker-end="url(#archArrow)"/>
+    <line x1="150" y1="174" x2="150" y2="208" stroke="#2e4566" stroke-width="1.5" marker-end="url(#archArrow)"/>
+    <line x1="340" y1="174" x2="340" y2="208" stroke="#2e4566" stroke-width="1.5" marker-end="url(#archArrow)"/>
+    <line x1="530" y1="174" x2="530" y2="208" stroke="#2e4566" stroke-width="1.5" marker-end="url(#archArrow)"/>
 
     <!-- Layer 3a: Prompt (x=40, w=186) -->
-    <rect x="40" y="210" width="186" height="72" rx="8" fill="#1c2128" stroke="#3fb950" stroke-width="1.5"/>
-    <text x="133" y="234" text-anchor="middle" fill="#56d364" font-size="12" font-weight="700">Prompt 层</text>
-    <text x="133" y="252" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">constants/prompts.ts</text>
-    <text x="133" y="268" text-anchor="middle" fill="#8b949e" font-size="10.5" font-family="monospace">systemPromptSections.ts</text>
+    <rect x="40" y="210" width="186" height="72" rx="8" fill="#0f1822" stroke="#39d353" stroke-width="1.5"/>
+    <text x="133" y="234" text-anchor="middle" fill="#39d353" font-size="12" font-weight="700">Prompt 层</text>
+    <text x="133" y="252" text-anchor="middle" fill="#4a6a8a" font-size="11" font-family="monospace">constants/prompts.ts</text>
+    <text x="133" y="268" text-anchor="middle" fill="#4a6a8a" font-size="10.5" font-family="monospace">systemPromptSections.ts</text>
 
     <!-- Layer 3b: API (x=234, w=186) -->
-    <rect x="234" y="210" width="186" height="72" rx="8" fill="#1c2128" stroke="#3fb950" stroke-width="1.5"/>
-    <text x="327" y="234" text-anchor="middle" fill="#56d364" font-size="12" font-weight="700">API 层</text>
-    <text x="327" y="252" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">services/api/claude.ts</text>
-    <text x="327" y="268" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">withRetry · streaming</text>
+    <rect x="234" y="210" width="186" height="72" rx="8" fill="#0f1822" stroke="#39d353" stroke-width="1.5"/>
+    <text x="327" y="234" text-anchor="middle" fill="#39d353" font-size="12" font-weight="700">API 层</text>
+    <text x="327" y="252" text-anchor="middle" fill="#4a6a8a" font-size="11" font-family="monospace">services/api/claude.ts</text>
+    <text x="327" y="268" text-anchor="middle" fill="#4a6a8a" font-size="11" font-family="monospace">withRetry · streaming</text>
 
     <!-- Layer 3c: Tools (x=428, w=212) -->
-    <rect x="428" y="210" width="212" height="72" rx="8" fill="#1c2128" stroke="#3fb950" stroke-width="1.5"/>
-    <text x="534" y="234" text-anchor="middle" fill="#56d364" font-size="12" font-weight="700">工具执行层</text>
-    <text x="534" y="252" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">tools/* · Tool.ts</text>
-    <text x="534" y="268" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">toolOrchestration</text>
+    <rect x="428" y="210" width="212" height="72" rx="8" fill="#0f1822" stroke="#39d353" stroke-width="1.5"/>
+    <text x="534" y="234" text-anchor="middle" fill="#39d353" font-size="12" font-weight="700">工具执行层</text>
+    <text x="534" y="252" text-anchor="middle" fill="#4a6a8a" font-size="11" font-family="monospace">tools/* · Tool.ts</text>
+    <text x="534" y="268" text-anchor="middle" fill="#4a6a8a" font-size="11" font-family="monospace">toolOrchestration</text>
 
     <!-- Arrow L3c→L4 -->
-    <line x1="534" y1="282" x2="534" y2="316" stroke="#484f58" stroke-width="1.5" marker-end="url(#archArrow)"/>
+    <line x1="534" y1="282" x2="534" y2="316" stroke="#2e4566" stroke-width="1.5" marker-end="url(#archArrow)"/>
 
     <!-- Layer 4: Permission -->
-    <rect x="428" y="318" width="212" height="62" rx="8" fill="#1c2128" stroke="#f85149" stroke-width="1.5"/>
-    <text x="534" y="342" text-anchor="middle" fill="#ff7b72" font-size="12" font-weight="700">权限系统</text>
-    <text x="534" y="360" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">hooks/toolPermission/</text>
-    <text x="534" y="374" text-anchor="middle" fill="#8b949e" font-size="10.5" font-family="monospace">PermissionContext · canUseTool()</text>
+    <rect x="428" y="318" width="212" height="62" rx="8" fill="#0f1822" stroke="#ff5c5c" stroke-width="1.5"/>
+    <text x="534" y="342" text-anchor="middle" fill="#ff5c5c" font-size="12" font-weight="700">权限系统</text>
+    <text x="534" y="360" text-anchor="middle" fill="#4a6a8a" font-size="11" font-family="monospace">hooks/toolPermission/</text>
+    <text x="534" y="374" text-anchor="middle" fill="#4a6a8a" font-size="10.5" font-family="monospace">PermissionContext · canUseTool()</text>
 
     <!-- Layer labels on left -->
-    <text x="22" y="56" text-anchor="middle" fill="#388bfd" font-size="9" font-weight="600" transform="rotate(-90,22,56)">L1</text>
-    <text x="22" y="144" text-anchor="middle" fill="#d29922" font-size="9" font-weight="600" transform="rotate(-90,22,144)">L2</text>
-    <text x="22" y="248" text-anchor="middle" fill="#3fb950" font-size="9" font-weight="600" transform="rotate(-90,22,248)">L3</text>
-    <text x="22" y="350" text-anchor="middle" fill="#f85149" font-size="9" font-weight="600" transform="rotate(-90,22,350)">L4</text>
+    <text x="22" y="56" text-anchor="middle" fill="#0099bb" font-size="9" font-weight="600" transform="rotate(-90,22,56)">L1</text>
+    <text x="22" y="144" text-anchor="middle" fill="#cc7a00" font-size="9" font-weight="600" transform="rotate(-90,22,144)">L2</text>
+    <text x="22" y="248" text-anchor="middle" fill="#39d353" font-size="9" font-weight="600" transform="rotate(-90,22,248)">L3</text>
+    <text x="22" y="350" text-anchor="middle" fill="#ff5c5c" font-size="9" font-weight="600" transform="rotate(-90,22,350)">L4</text>
   </svg>
 </div>
 

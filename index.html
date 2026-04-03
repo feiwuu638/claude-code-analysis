@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Claude Code 源码解析</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/base16/tomorrow-night.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 <body>
@@ -42,7 +42,7 @@
 <!-- ── Main ── -->
 <div id="main">
   <div id="content">
-    <section class="page-section active" id="page-overview"><div class="page-loading">加载中...</div></section>
+    <section class="page-section active" id="page-overview"><div class="page-loading">加载中</div></section>
     <section class="page-section" id="page-architecture"></section>
     <section class="page-section" id="page-agent-loop"></section>
     <section class="page-section" id="page-system-prompt"></section>
@@ -69,6 +69,12 @@
     </aside>
   </div>
 </div><!-- /#main -->
+
+<!-- ── Theme Toggle ── -->
+<button id="theme-toggle" title="切换日间/夜间模式">
+  <svg id="theme-icon-moon" viewBox="0 0 16 16" fill="currentColor" width="15" height="15"><path d="M9.598 1.591a.749.749 0 0 1 .785-.175 7 7 0 1 1-8.967 8.967.75.75 0 0 1 .961-.96 5.5 5.5 0 0 0 7.046-7.046.75.75 0 0 1 .175-.786zm1.616 1.945a7 7 0 0 1-7.678 7.678 5.499 5.499 0 1 0 7.678-7.678z"/></svg>
+  <svg id="theme-icon-sun" viewBox="0 0 16 16" fill="currentColor" width="15" height="15" style="display:none"><path d="M8 12a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-1.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM8 0a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V.75A.75.75 0 0 1 8 0zm0 13a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 8 13zM2.343 2.343a.75.75 0 0 1 1.061 0l1.06 1.061a.75.75 0 0 1-1.06 1.06l-1.061-1.06a.75.75 0 0 1 0-1.061zm9.193 9.193a.75.75 0 0 1 1.06 0l1.061 1.06a.75.75 0 0 1-1.06 1.061l-1.061-1.06a.75.75 0 0 1 0-1.061zM0 8a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5H.75A.75.75 0 0 1 0 8zm13 0a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5A.75.75 0 0 1 13 8zM2.343 13.657a.75.75 0 0 1 0-1.06l1.061-1.061a.75.75 0 0 1 1.06 1.06l-1.06 1.061a.75.75 0 0 1-1.061 0zm9.193-9.193a.75.75 0 0 1 0-1.06l1.06-1.061a.75.75 0 0 1 1.061 1.06l-1.06 1.061a.75.75 0 0 1-1.061 0z"/></svg>
+</button>
 
 <!-- ── Prompt Drawer ── -->
 <div id="drawer-overlay"></div>
@@ -311,6 +317,23 @@ makeResizable({
   direction: 'left',
   min: 120,
   max: 360,
+});
+
+// ── Theme Toggle ──
+const themeToggle = document.getElementById('theme-toggle');
+const iconMoon = document.getElementById('theme-icon-moon');
+const iconSun  = document.getElementById('theme-icon-sun');
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme === 'light') {
+  document.documentElement.classList.add('light');
+  iconMoon.style.display = 'none';
+  iconSun.style.display  = '';
+}
+themeToggle.addEventListener('click', () => {
+  const isLight = document.documentElement.classList.toggle('light');
+  iconMoon.style.display = isLight ? 'none' : '';
+  iconSun.style.display  = isLight ? '' : 'none';
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
 });
 </script>
 </body>

@@ -20,16 +20,16 @@ export async function* query(params: QueryParams): AsyncGenerator&lt;...&gt; {
   <svg id="agentLoopSvg" viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg" class="loop-svg">
     <defs>
       <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-        <path d="M0,0 L0,6 L8,3 z" fill="#388bfd"/>
+        <path d="M0,0 L0,6 L8,3 z" fill="#0099bb"/>
       </marker>
       <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-        <path d="M0,0 L0,6 L8,3 z" fill="#3fb950"/>
+        <path d="M0,0 L0,6 L8,3 z" fill="#39d353"/>
       </marker>
       <marker id="arrowRed" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-        <path d="M0,0 L0,6 L8,3 z" fill="#f85149"/>
+        <path d="M0,0 L0,6 L8,3 z" fill="#ff5c5c"/>
       </marker>
       <marker id="arrowGray" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-        <path d="M0,0 L0,6 L8,3 z" fill="#484f58"/>
+        <path d="M0,0 L0,6 L8,3 z" fill="#2e4566"/>
       </marker>
       <filter id="glow">
         <feGaussianBlur stdDeviation="3" result="blur"/>
@@ -39,80 +39,80 @@ export async function* query(params: QueryParams): AsyncGenerator&lt;...&gt; {
 
     <!-- User Input (top) -->
     <g class="loop-node" id="node-user">
-      <rect x="290" y="20" width="180" height="44" rx="22" fill="#21262d" stroke="#484f58" stroke-width="1.5"/>
-      <text x="380" y="37" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace">用户输入</text>
-      <text x="380" y="53" text-anchor="middle" fill="#cdd6f4" font-size="12" font-weight="600">User Message</text>
+      <rect x="290" y="20" width="180" height="44" rx="22" fill="#1e2d42" stroke="#2e4566" stroke-width="1.5"/>
+      <text x="380" y="37" text-anchor="middle" fill="#4a6a8a" font-size="11" font-family="monospace">用户输入</text>
+      <text x="380" y="53" text-anchor="middle" fill="#9ab8d4" font-size="12" font-weight="600">User Message</text>
     </g>
 
     <!-- Arrow: User → Step1 -->
-    <line class="loop-arrow" id="arrow-user-1" x1="380" y1="64" x2="380" y2="106" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
+    <line class="loop-arrow" id="arrow-user-1" x1="380" y1="64" x2="380" y2="106" stroke="#2e4566" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
 
     <!-- Step 1: Preprocess -->
     <g class="loop-node loop-step" id="node-1" data-step="1">
-      <rect x="240" y="108" width="280" height="72" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
-      <text x="380" y="130" text-anchor="middle" fill="#8b949e" font-size="11">① 预处理</text>
-      <text x="380" y="148" text-anchor="middle" fill="#cdd6f4" font-size="12.5" font-weight="600">applyToolResultBudget</text>
-      <text x="380" y="166" text-anchor="middle" fill="#8b949e" font-size="11">microcompact / autocompact</text>
+      <rect x="240" y="108" width="280" height="72" rx="8" fill="#0a0f16" stroke="#253650" stroke-width="1.5"/>
+      <text x="380" y="130" text-anchor="middle" fill="#4a6a8a" font-size="11">① 预处理</text>
+      <text x="380" y="148" text-anchor="middle" fill="#9ab8d4" font-size="12.5" font-weight="600">applyToolResultBudget</text>
+      <text x="380" y="166" text-anchor="middle" fill="#4a6a8a" font-size="11">microcompact / autocompact</text>
     </g>
 
     <!-- Arrow: Step1 → Step2 -->
-    <line class="loop-arrow" id="arrow-1-2" x1="380" y1="180" x2="380" y2="218" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
+    <line class="loop-arrow" id="arrow-1-2" x1="380" y1="180" x2="380" y2="218" stroke="#2e4566" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
 
     <!-- Step 2: Build Request -->
     <g class="loop-node loop-step" id="node-2" data-step="2">
-      <rect x="240" y="220" width="280" height="72" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
-      <text x="380" y="242" text-anchor="middle" fill="#8b949e" font-size="11">② 构建请求</text>
-      <text x="380" y="260" text-anchor="middle" fill="#cdd6f4" font-size="12.5" font-weight="600">appendSystemContext</text>
-      <text x="380" y="278" text-anchor="middle" fill="#8b949e" font-size="11">messages · tools · model · thinkingConfig</text>
+      <rect x="240" y="220" width="280" height="72" rx="8" fill="#0a0f16" stroke="#253650" stroke-width="1.5"/>
+      <text x="380" y="242" text-anchor="middle" fill="#4a6a8a" font-size="11">② 构建请求</text>
+      <text x="380" y="260" text-anchor="middle" fill="#9ab8d4" font-size="12.5" font-weight="600">appendSystemContext</text>
+      <text x="380" y="278" text-anchor="middle" fill="#4a6a8a" font-size="11">messages · tools · model · thinkingConfig</text>
     </g>
 
     <!-- Arrow: Step2 → Step3 -->
-    <line class="loop-arrow" id="arrow-2-3" x1="380" y1="292" x2="380" y2="330" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
+    <line class="loop-arrow" id="arrow-2-3" x1="380" y1="292" x2="380" y2="330" stroke="#2e4566" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
 
     <!-- Step 3: Call API -->
     <g class="loop-node loop-step" id="node-3" data-step="3">
-      <rect x="240" y="332" width="280" height="72" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
-      <text x="380" y="354" text-anchor="middle" fill="#8b949e" font-size="11">③ 调用 API（流式）</text>
-      <text x="380" y="372" text-anchor="middle" fill="#cdd6f4" font-size="12.5" font-weight="600">deps.callModel()</text>
-      <text x="380" y="390" text-anchor="middle" fill="#8b949e" font-size="11">text → yield UI · tool_use → 队列 · thinking → 透传</text>
+      <rect x="240" y="332" width="280" height="72" rx="8" fill="#0a0f16" stroke="#253650" stroke-width="1.5"/>
+      <text x="380" y="354" text-anchor="middle" fill="#4a6a8a" font-size="11">③ 调用 API（流式）</text>
+      <text x="380" y="372" text-anchor="middle" fill="#9ab8d4" font-size="12.5" font-weight="600">deps.callModel()</text>
+      <text x="380" y="390" text-anchor="middle" fill="#4a6a8a" font-size="11">text → yield UI · tool_use → 队列 · thinking → 透传</text>
     </g>
 
     <!-- Arrow: Step3 → Step4 -->
-    <line class="loop-arrow" id="arrow-3-4" x1="380" y1="404" x2="380" y2="442" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
+    <line class="loop-arrow" id="arrow-3-4" x1="380" y1="404" x2="380" y2="442" stroke="#2e4566" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
 
     <!-- Step 4: Execute Tools -->
     <g class="loop-node loop-step" id="node-4" data-step="4">
-      <rect x="240" y="444" width="280" height="60" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
-      <text x="380" y="466" text-anchor="middle" fill="#8b949e" font-size="11">④ 执行工具</text>
-      <text x="380" y="484" text-anchor="middle" fill="#cdd6f4" font-size="12.5" font-weight="600">canUseTool() → runTools()</text>
+      <rect x="240" y="444" width="280" height="60" rx="8" fill="#0a0f16" stroke="#253650" stroke-width="1.5"/>
+      <text x="380" y="466" text-anchor="middle" fill="#4a6a8a" font-size="11">④ 执行工具</text>
+      <text x="380" y="484" text-anchor="middle" fill="#9ab8d4" font-size="12.5" font-weight="600">canUseTool() → runTools()</text>
     </g>
 
     <!-- Decision diamond -->
     <g class="loop-node loop-step" id="node-5" data-step="5">
-      <polygon points="620,474 680,500 620,526 560,500" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
-      <text x="620" y="496" text-anchor="middle" fill="#8b949e" font-size="10">tool_use?</text>
-      <text x="620" y="510" text-anchor="middle" fill="#cdd6f4" font-size="11" font-weight="600">继续？</text>
+      <polygon points="620,474 680,500 620,526 560,500" fill="#0a0f16" stroke="#253650" stroke-width="1.5"/>
+      <text x="620" y="496" text-anchor="middle" fill="#4a6a8a" font-size="10">tool_use?</text>
+      <text x="620" y="510" text-anchor="middle" fill="#9ab8d4" font-size="11" font-weight="600">继续？</text>
     </g>
 
     <!-- Arrow: Step4 → Decision -->
-    <line class="loop-arrow" id="arrow-4-5" x1="520" y1="474" x2="558" y2="492" stroke="#484f58" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
+    <line class="loop-arrow" id="arrow-4-5" x1="520" y1="474" x2="558" y2="492" stroke="#2e4566" stroke-width="1.5" marker-end="url(#arrowGray)" opacity="0.4"/>
 
     <!-- Loop back arrow: Decision → Step1 (YES) -->
-    <path class="loop-arrow" id="arrow-loop" d="M620,474 L620,144 L522,144" fill="none" stroke="#3fb950" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowGreen)" opacity="0"/>
-    <text class="loop-label" id="label-loop" x="660" y="310" fill="#3fb950" font-size="11" text-anchor="middle" opacity="0">有工具调用</text>
-    <text class="loop-label" id="label-loop2" x="660" y="324" fill="#3fb950" font-size="11" text-anchor="middle" opacity="0">→ 下一轮</text>
+    <path class="loop-arrow" id="arrow-loop" d="M620,474 L620,144 L522,144" fill="none" stroke="#39d353" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowGreen)" opacity="0"/>
+    <text class="loop-label" id="label-loop" x="660" y="310" fill="#39d353" font-size="11" text-anchor="middle" opacity="0">有工具调用</text>
+    <text class="loop-label" id="label-loop2" x="660" y="324" fill="#39d353" font-size="11" text-anchor="middle" opacity="0">→ 下一轮</text>
 
     <!-- Terminal arrow: Decision → Terminal (NO) -->
-    <line class="loop-arrow" id="arrow-terminal" x1="680" y1="500" x2="730" y2="500" stroke="#f85149" stroke-width="2" marker-end="url(#arrowRed)" opacity="0"/>
+    <line class="loop-arrow" id="arrow-terminal" x1="680" y1="500" x2="730" y2="500" stroke="#ff5c5c" stroke-width="2" marker-end="url(#arrowRed)" opacity="0"/>
     <g id="node-terminal" opacity="0">
-      <rect x="732" y="482" width="24" height="36" rx="4" fill="#f85149" opacity="0.15" stroke="#f85149" stroke-width="1.5"/>
-      <text x="744" y="496" text-anchor="middle" fill="#f85149" font-size="9">END</text>
-      <text x="744" y="510" text-anchor="middle" fill="#f85149" font-size="8">Terminal</text>
+      <rect x="732" y="482" width="24" height="36" rx="4" fill="#ff5c5c" opacity="0.15" stroke="#ff5c5c" stroke-width="1.5"/>
+      <text x="744" y="496" text-anchor="middle" fill="#ff5c5c" font-size="9">END</text>
+      <text x="744" y="510" text-anchor="middle" fill="#ff5c5c" font-size="8">Terminal</text>
     </g>
 
     <!-- YES/NO labels on diamond -->
-    <text id="label-yes" x="620" y="468" text-anchor="middle" fill="#3fb950" font-size="10" opacity="0">YES ↑</text>
-    <text id="label-no" x="700" y="498" text-anchor="middle" fill="#f85149" font-size="10" opacity="0">NO →</text>
+    <text id="label-yes" x="620" y="468" text-anchor="middle" fill="#39d353" font-size="10" opacity="0">YES ↑</text>
+    <text id="label-no" x="700" y="498" text-anchor="middle" fill="#ff5c5c" font-size="10" opacity="0">NO →</text>
   </svg>
 </div>
 
@@ -174,9 +174,9 @@ function initAgentLoop() {
     { nodeId: 'node-5', arrowIn: 'arrow-4-5',    detailId: 'detail-5', label: '⑤ 判断：有 tool_use → 继续循环；无 → 结束' },
   ];
 
-  const ACTIVE_STROKE = { '1':'#388bfd','2':'#388bfd','3':'#388bfd','4':'#388bfd','5':'#d29922' };
-  const ACTIVE_TEXT   = { '1':'#79c0ff','2':'#79c0ff','3':'#79c0ff','4':'#79c0ff','5':'#e3b341' };
-  const ARROW_ACTIVE  = { '1':'#388bfd','2':'#388bfd','3':'#388bfd','4':'#388bfd','5':'#d29922' };
+  const ACTIVE_STROKE = { '1':'#0099bb','2':'#0099bb','3':'#0099bb','4':'#0099bb','5':'#cc7a00' };
+  const ACTIVE_TEXT   = { '1':'#00d9ff','2':'#00d9ff','3':'#00d9ff','4':'#00d9ff','5':'#ffb347' };
+  const ARROW_ACTIVE  = { '1':'#0099bb','2':'#0099bb','3':'#0099bb','4':'#0099bb','5':'#cc7a00' };
   const ARROW_MARKER  = { '1':'arrowBlue','2':'arrowBlue','3':'arrowBlue','4':'arrowBlue','5':'arrowGray' };
 
   let currentStep = 0;
@@ -191,12 +191,12 @@ function initAgentLoop() {
       const node = document.getElementById(s.nodeId);
       if (node) {
         const rect = node.querySelector('rect,polygon');
-        if (rect) { rect.setAttribute('stroke', '#30363d'); rect.removeAttribute('filter'); }
+        if (rect) { rect.setAttribute('stroke', '#253650'); rect.removeAttribute('filter'); }
         const texts = node.querySelectorAll('text');
-        texts.forEach(t => t.setAttribute('fill', t.getAttribute('data-orig-fill') || '#8b949e'));
+        texts.forEach(t => t.setAttribute('fill', t.getAttribute('data-orig-fill') || '#4a6a8a'));
       }
       const arrow = document.getElementById(s.arrowIn);
-      if (arrow) { arrow.setAttribute('stroke', '#484f58'); arrow.setAttribute('opacity', '0.4'); arrow.setAttribute('marker-end', 'url(#arrowGray)'); }
+      if (arrow) { arrow.setAttribute('stroke', '#2e4566'); arrow.setAttribute('opacity', '0.4'); arrow.setAttribute('marker-end', 'url(#arrowGray)'); }
       const detail = document.getElementById(s.detailId);
       if (detail) detail.classList.remove('active');
     });
